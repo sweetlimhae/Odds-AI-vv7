@@ -138,9 +138,12 @@ async function analyze() {
           <div><small>하락률</small><b>${best.drop_rate ?? "-"}%</b></div>
           <div><small>EV</small><b>${best.ev ?? "-"}%</b></div>
           <div><small>Edge</small><b>${best.ai_edge ?? "-"}%</b></div>
-        </div>
-
-        <p class="reason">
+          <div><small>Sharp</small><b>${best.sharp_score ?? "-"}점</b></div>
+          <div><small>Steam</small><b>${best.steam_score ?? "-"}점</b></div>
+          <div><small>CLV</small><b>${best.clv_score ?? "-"}점</b></div>
+          <div><small>Kelly</small><b>${best.kelly ?? "-"}%</b></div>
+          </div>
+          <p class="reason">
           ${(best.reasons || ["배당 흐름과 시장 평균 기준으로 우위가 있습니다."]).join(" · ")}
         </p>
       </article>
