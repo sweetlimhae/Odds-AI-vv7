@@ -1,12 +1,26 @@
+const sportEl = document.getElementById("sport");
+const minutesEl = document.getElementById("minutes");
+const resultsEl = document.getElementById("results");
+const statusEl = document.getElementById("status");
+
+document.getElementById("gamesBtn").addEventListener("click", loadGames);
+document.getElementById("analyzeBtn").addEventListener("click", analyze);
+
+function params() {
+  return `sport=${encodeURIComponent(sportEl.value)}&minutes=${encodeURIComponent(minutesEl.value)}`;
+}
+
+function setStatus(text) {
+  statusEl.innerHTML = text ? `<div class="notice">${text}</div>` : "";
+}
+
 function decisionFromMarket(m) {
   const odds = Number(m.odds || 0);
   const openOdds = Number(m.open_odds || 0);
-  const pinnacle = Number(m.pinnacle_odds || 0);
   const avg = Number(m.market_avg || 0);
 
   const dropRate = openOdds > 0 ? ((openOdds - odds) / openOdds) * 100 : 0;
   const edge = avg > 0 ? ((avg - odds) / odds) * 100 : 0;
-  const ev = pinnacle > 0 ? ((pinnacle / odds - 1) * 100) : edge;
 
   if (dropRate >= 5 && edge >= 2) return "BET";
   if (dropRate >= 2 || edge >= 1) return "WATCH";
@@ -28,6 +42,7 @@ function renderGames(games) {
   resultsEl.innerHTML = games.map(game => {
     const market = (game.markets || [])[0] || {};
     const decision = decisionFromMarket(market);
+
     const odds = Number(market.odds || 0);
     const openOdds = Number(market.open_odds || 0);
     const avg = Number(market.market_avg || 0);
@@ -66,3 +81,55 @@ function renderGames(games) {
     `;
   }).join("");
 }
+
+async function loadGames() {
+  setStatus("경기 불러오는 중...");
+  resultsEl.innerHTML = `<div class="card">불러오는 중...</div>`;
+
+  try {
+    const res = await fetch(`/api/live-games?${params()}`);
+    const data = await res.json();
+    setStatus(data.notice || `총 ${data.count || 0}경기`);
+    renderGames(data.games);
+  } catch (err) {
+    console.error(err);
+    resultsEl.innerHTML = `<div class="card danger">경기 불러오기 실패</div>`;
+  }
+}
+
+async function analyze() {
+  setStatus("AI 분석 중...");
+  resultsEl.innerHTML = `<div class="card">AI 분석 중...</div>`;
+
+  try {
+    const res = await fetch(`/api/recommendations?${params()}`);
+    const data = await res.json();
+
+    setStatus(data.notice || "AI 분석 완료");
+
+    resultsEl.innerHTML = `
+      <article class="card highlight">
+        <h2>오늘 분석 요약</h2>
+        <p>분석픽: ${data.summary?.total_picks ?? 0}</p>
+        <p>BET: ${data.summary?.bet_count ?? 0}</p>
+        <p>관찰: ${data.summary?.watch_count ?? 0}</p>
+        <p>No Bet: ${data.summary?.no_bet_count ?? 0}</p>
+      </article>
+      ${(data.top_picks || []).map((p, i) => `
+        <article class="card">
+          <div class="tag">${p.decision || "-"}</div>
+          <h2>${p.game || "-"}</h2>
+          <p><b>추천: ${p.pick || "-"}</b></p>
+          <p>신뢰도: ${p.confidence ?? p.score ?? 0}%</p>
+          <p>EV: ${p.ev ?? "-"}%</p>
+          <p>Edge: ${p.ai_edge ?? "-"}%</p>
+        </article>
+      `).join("")}
+    `;
+  } catch (err) {
+    console.error(err);
+    resultsEl.innerHTML = `<div class="card danger">AI 분석 실패</div>`;
+  }
+}
+
+loadGames();
