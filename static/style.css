@@ -219,3 +219,26 @@ button.primary { background: linear-gradient(135deg, #00d084, #00e1ff); }
 .muted {
   opacity: 0.72;
 }
+.book-table {
+  margin-top: 16px;
+  padding: 14px;
+  border-radius: 14px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.08);
+}
+
+.book-table h3 {
+  margin: 0 0 10px;
+  font-size: 15px;
+}
+
+.book-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+
+.book-row:last-child {
+  border-bottom: none;
+}
