@@ -4,46 +4,10 @@ from datetime import datetime, timezone
 
 ODDS_API_KEY = os.getenv("ODDS_API_KEY", "")
 
-SPORT_KEYS = {
-    "soccer": [
-        "soccer_epl",
-        "soccer_efl_champ",
-        "soccer_england_league1",
-        "soccer_england_league2",
-        "soccer_spain_la_liga",
-        "soccer_spain_segunda_division",
-        "soccer_germany_bundesliga",
-        "soccer_germany_bundesliga2",
-        "soccer_italy_serie_a",
-        "soccer_italy_serie_b",
-        "soccer_france_ligue_one",
-        "soccer_france_ligue_two",
-        "soccer_netherlands_eredivisie",
-        "soccer_portugal_primeira_liga",
-        "soccer_turkey_super_league",
-        "soccer_japan_j_league",
-        "soccer_korea_kleague1",
-        "soccer_usa_mls",
-        "soccer_mexico_ligamx",
-        "soccer_brazil_campeonato",
-        "soccer_argentina_primera_division",
-    ],
-    "baseball": [
-        "baseball_mlb",
-        "baseball_kbo",
-        "baseball_npb",
-    ],
-    "basketball": [
-        "basketball_nba",
-        "basketball_wnba",
-    ],
-    "hockey": [
-        "icehockey_nhl",
-    ],
-    "americanfootball": [
-        "americanfootball_nfl",
-    ],
-}
+BASE_URL = "https://api.the-odds-api.com/v4"
+
+# 크레딧 아끼려고 한 번에 너무 많이 호출하지 않게 제한
+MAX_LEAGUES_PER_REQUEST = 8
 
 
 def safe_float(value, default=0.0):
@@ -71,18 +35,88 @@ def market_average(values):
     return round(sum(nums) / len(nums), 3)
 
 
-def selected_sport_keys(sport):
-    if sport == "all":
-        keys = []
-        for group in SPORT_KEYS.values():
-            keys.extend(group)
-        return keys
+def get_available_sports():
+    if not ODDS_API_KEY:
+        return []
 
-    return SPORT_KEYS.get(sport, [])
+    try:
+        r = requests.get(
+            f"{BASE_URL}/sports/",
+            params={"apiKey": ODDS_API_KEY},
+            timeout=10
+        )
+        if r.status_code != 200:
+            return []
+        return r.json()
+    except Exception:
+        return []
+
+
+def selected_sport_keys(sport):
+    available = get_available_sports()
+
+    if not available:
+        return []
+
+    keys = []
+
+    if sport == "soccer":
+        keys = [
+            s["key"] for s in available
+            if s.get("active") and s.get("key", "").startswith("soccer_")
+        ]
+
+    elif sport == "baseball":
+        keys = [
+            s["key"] for s in available
+            if s.get("active") and s.get("key") in [
+                "baseball_mlb",
+                "baseball_kbo",
+                "baseball_npb",
+            ]
+        ]
+
+    elif sport == "basketball":
+        keys = [
+            s["key"] for s in available
+            if s.get("active") and s.get("key") in [
+                "basketball_nba",
+                "basketball_wnba",
+            ]
+        ]
+
+    elif sport == "hockey":
+        keys = [
+            s["key"] for s in available
+            if s.get("active") and s.get("key") == "icehockey_nhl"
+        ]
+
+    elif sport == "americanfootball":
+        keys = [
+            s["key"] for s in available
+            if s.get("active") and s.get("key") == "americanfootball_nfl"
+        ]
+
+    elif sport == "all":
+        for s in available:
+            key = s.get("key", "")
+            if not s.get("active"):
+                continue
+
+            if (
+                key.startswith("soccer_")
+                or key in ["baseball_mlb", "baseball_kbo", "baseball_npb"]
+                or key in ["basketball_nba", "basketball_wnba"]
+                or key == "icehockey_nhl"
+                or key == "americanfootball_nfl"
+            ):
+                keys.append(key)
+
+    return keys[:MAX_LEAGUES_PER_REQUEST]
 
 
 def fetch_one_league(sport_key):
-    url = f"https://api.the-odds-api.com/v4/sports/{sport_key}/odds"
+    url = f"{BASE_URL}/sports/{sport_key}/odds"
 
     params = {
         "apiKey": ODDS_API_KEY,
@@ -166,8 +200,21 @@ def fetch_one_league(sport_key):
             })
 
         if markets:
+            if sport_key.startswith("baseball"):
+                sport = "baseball"
+            elif sport_key.startswith("soccer"):
+                sport = "soccer"
+            elif sport_key.startswith("basketball"):
+                sport = "basketball"
+            elif sport_key.startswith("icehockey"):
+                sport = "hockey"
+            elif sport_key.startswith("americanfootball"):
+                sport = "americanfootball"
+            else:
+                sport = "other"
+
             games.append({
-                "sport": "baseball" if sport_key.startswith("baseball") else "soccer" if sport_key.startswith("soccer") else "other",
+                "sport": sport,
                 "league": sport_key,
                 "home": item.get("home_team"),
                 "away": item.get("away_team"),
@@ -183,18 +230,21 @@ def get_games(sport="all"):
     if not ODDS_API_KEY:
         return [], "error", "ODDS_API_KEY가 없습니다."
 
+    keys = selected_sport_keys(sport)
+
+    if not keys:
+        return [], "live", "활성화된 리그가 없거나 API 키 문제가 있습니다."
+
     games = []
     errors = []
 
-    for sport_key in selected_sport_keys(sport):
+    for sport_key in keys:
         try:
             games.extend(fetch_one_league(sport_key))
         except Exception as e:
             errors.append(f"{sport_key}: {str(e)}")
 
     if not games:
-        if errors:
-            return [], "live", "실시간 데이터 없음 / 일부 리그 오류"
         return [], "live", "현재 조건에 맞는 실시간 경기가 없습니다."
 
     return games, "live", f"실시간 Odds API 데이터 {len(games)}경기 로드 완료"
