@@ -135,7 +135,29 @@ def make_game_from_block(block, index):
             for i, odd in enumerate(odds[:4])
         ],
     }
+def detect_league(text):
+    league_words = [
+        "KBO", "NPB", "MLB",
+        "J League", "J1 League", "J2 League",
+        "K League", "K League 1", "K League 2",
+        "EPL", "Premier League", "Championship",
+        "League One", "League Two",
+        "La Liga", "Segunda",
+        "Serie A", "Serie B",
+        "Bundesliga", "2. Bundesliga",
+        "Ligue 1", "Ligue 2",
+        "Eredivisie",
+        "Primeira Liga",
+        "MLS",
+        "Brazil Serie A",
+        "Argentina Primera",
+    ]
 
+    for word in league_words:
+        if word.lower() in text.lower():
+            return word
+
+    return "BMBets"
 
 def get_games(sport="all"):
     try:
