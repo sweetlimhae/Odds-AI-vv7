@@ -107,29 +107,68 @@ async function analyze() {
 
     setStatus(data.notice || "AI 분석 완료");
 
+    const picks = data.top_picks || [];
+    const best = picks[0];
+
+    if (!best) {
+      resultsEl.innerHTML = `<div class="card danger">추천 가능한 픽이 없습니다.</div>`;
+      return;
+    }
+
     resultsEl.innerHTML = `
-      <article class="card highlight">
+      <article class="card highlight game-card bet">
+        <div class="card-top">
+          <div class="tag">🥇 BEST PICK</div>
+          <div class="decision bet">${best.decision || "BET"}</div>
+        </div>
+
+        <h2>${best.game || "-"}</h2>
+
+        <div class="pick-box">
+          <small>추천픽</small>
+          <b>${best.pick || "-"}</b>
+        </div>
+
+        <div class="summary-grid">
+          <div><small>등급</small><b>${best.grade || "★★★★★"}</b></div>
+          <div><small>신뢰도</small><b>${best.confidence ?? best.score ?? 0}%</b></div>
+          <div><small>현재배당</small><b>${best.odds ?? "-"}</b></div>
+          <div><small>Pinnacle</small><b>${best.pinnacle_odds ?? "-"}</b></div>
+          <div><small>시장평균</small><b>${best.market_avg ?? "-"}</b></div>
+          <div><small>하락률</small><b>${best.drop_rate ?? "-"}%</b></div>
+          <div><small>EV</small><b>${best.ev ?? "-"}%</b></div>
+          <div><small>Edge</small><b>${best.ai_edge ?? "-"}%</b></div>
+        </div>
+
+        <p class="reason">
+          ${(best.reasons || ["배당 흐름과 시장 평균 기준으로 우위가 있습니다."]).join(" · ")}
+        </p>
+      </article>
+
+      <article class="card">
         <h2>오늘 분석 요약</h2>
         <p>분석픽: ${data.summary?.total_picks ?? 0}</p>
         <p>BET: ${data.summary?.bet_count ?? 0}</p>
         <p>관찰: ${data.summary?.watch_count ?? 0}</p>
         <p>No Bet: ${data.summary?.no_bet_count ?? 0}</p>
+        <p>평균 EV: ${data.summary?.avg_ev ?? 0}%</p>
+        <p>평균 Edge: ${data.summary?.avg_edge ?? 0}%</p>
       </article>
-      ${(data.top_picks || []).map((p, i) => `
-        <article class="card">
-          <div class="tag">${p.decision || "-"}</div>
-          <h2>${p.game || "-"}</h2>
-          <p><b>추천: ${p.pick || "-"}</b></p>
-          <p>신뢰도: ${p.confidence ?? p.score ?? 0}%</p>
-          <p>EV: ${p.ev ?? "-"}%</p>
-          <p>Edge: ${p.ai_edge ?? "-"}%</p>
-        </article>
-      `).join("")}
+
+      <article class="card">
+        <h2>단일픽 TOP</h2>
+        ${picks.slice(1, 10).map((p, i) => `
+          <div class="pick">
+            <div class="tag">#${i + 2} ${p.decision || "-"}</div>
+            <h3>${p.game || "-"}</h3>
+            <p><b>추천: ${p.pick || "-"}</b></p>
+            <p>신뢰도: ${p.confidence ?? p.score ?? 0}% / EV: ${p.ev ?? "-"}% / Edge: ${p.ai_edge ?? "-"}%</p>
+          </div>
+        `).join("")}
+      </article>
     `;
   } catch (err) {
     console.error(err);
     resultsEl.innerHTML = `<div class="card danger">AI 분석 실패</div>`;
   }
 }
-
-loadGames();
