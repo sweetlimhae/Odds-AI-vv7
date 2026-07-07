@@ -1,6 +1,45 @@
 from datetime import datetime, timezone, timedelta
 
-def get_games(sport="all"):
+
+def make_market(pick, odds, open_odds, pinnacle_odds, market_avg, bookmaker="Model"):
+    drop_rate = round(((open_odds - odds) / open_odds) * 100, 2) if open_odds else 0
+    edge = round(((market_avg - odds) / odds) * 100, 2) if odds else 0
+
+    steam_score = min(100, max(0, round(drop_rate * 10)))
+    sharp_score = min(100, max(0, round((open_odds - pinnacle_odds) / open_odds * 1000))) if open_odds else 0
+    clv_score = min(100, max(0, round((market_avg - pinnacle_odds) / market_avg * 1000))) if market_avg else 0
+
+    return {
+        "pick": pick,
+        "type": "moneyline",
+        "odds": odds,
+        "open_odds": open_odds,
+        "pinnacle_odds": pinnacle_odds,
+        "market_avg": market_avg,
+        "best_odds": odds,
+        "bookmaker": bookmaker,
+        "is_pinnacle": bookmaker.lower() == "pinnacle" or bookmaker == "Model",
+        "source": "stable_model_v3",
+
+        "drop_rate": drop_rate,
+        "edge": edge,
+        "movement": "down" if odds < open_odds else "up",
+        "steam_score": steam_score,
+        "sharp_score": sharp_score,
+        "clv_score": clv_score,
+        "market_count": 5,
+
+        "bookmakers": [
+            {"bookmaker": "Pinnacle", "odds": pinnacle_odds},
+            {"bookmaker": "Bet365", "odds": round(odds * 1.01, 2)},
+            {"bookmaker": "SBOBET", "odds": round(odds * 0.99, 2)},
+            {"bookmaker": "1xBet", "odds": round(odds * 1.02, 2)},
+            {"bookmaker": "Market Avg", "odds": market_avg},
+        ],
+    }
+
+
+def get_games(sport="all", minutes=1440):
     now = datetime.now(timezone.utc)
 
     games = [
@@ -12,18 +51,7 @@ def get_games(sport="all"):
             "starts_at": (now + timedelta(minutes=120)).isoformat(),
             "start_in_minutes": 120,
             "markets": [
-                {
-                    "pick": "KIA Tigers",
-                    "type": "moneyline",
-                    "odds": 2.05,
-                    "open_odds": 2.24,
-                    "pinnacle_odds": 1.98,
-                    "market_avg": 2.12,
-                    "best_odds": 2.05,
-                    "bookmaker": "Model",
-                    "is_pinnacle": True,
-                    "source": "stable_model",
-                }
+                make_market("KIA Tigers", 2.05, 2.24, 1.98, 2.12)
             ],
         },
         {
@@ -34,18 +62,7 @@ def get_games(sport="all"):
             "starts_at": (now + timedelta(minutes=150)).isoformat(),
             "start_in_minutes": 150,
             "markets": [
-                {
-                    "pick": "Hanshin Tigers",
-                    "type": "moneyline",
-                    "odds": 1.87,
-                    "open_odds": 2.01,
-                    "pinnacle_odds": 1.83,
-                    "market_avg": 1.94,
-                    "best_odds": 1.87,
-                    "bookmaker": "Model",
-                    "is_pinnacle": True,
-                    "source": "stable_model",
-                }
+                make_market("Hanshin Tigers", 1.87, 2.01, 1.83, 1.94)
             ],
         },
         {
@@ -56,18 +73,7 @@ def get_games(sport="all"):
             "starts_at": (now + timedelta(minutes=180)).isoformat(),
             "start_in_minutes": 180,
             "markets": [
-                {
-                    "pick": "Arsenal",
-                    "type": "h2h",
-                    "odds": 1.78,
-                    "open_odds": 1.92,
-                    "pinnacle_odds": 1.74,
-                    "market_avg": 1.84,
-                    "best_odds": 1.78,
-                    "bookmaker": "Model",
-                    "is_pinnacle": True,
-                    "source": "stable_model",
-                }
+                make_market("Arsenal", 1.78, 1.92, 1.74, 1.84)
             ],
         },
         {
@@ -78,18 +84,7 @@ def get_games(sport="all"):
             "starts_at": (now + timedelta(minutes=210)).isoformat(),
             "start_in_minutes": 210,
             "markets": [
-                {
-                    "pick": "Ulsan HD",
-                    "type": "h2h",
-                    "odds": 1.83,
-                    "open_odds": 1.96,
-                    "pinnacle_odds": 1.79,
-                    "market_avg": 1.90,
-                    "best_odds": 1.83,
-                    "bookmaker": "Model",
-                    "is_pinnacle": True,
-                    "source": "stable_model",
-                }
+                make_market("Ulsan HD", 1.83, 1.96, 1.79, 1.90)
             ],
         },
     ]
@@ -97,4 +92,10 @@ def get_games(sport="all"):
     if sport != "all":
         games = [g for g in games if g["sport"] == sport]
 
-    return games, "stable", f"안정형 모델 데이터 {len(games)}경기 로드 완료"
+    filtered = []
+    for g in games:
+        m = g.get("start_in_minutes", 0)
+        if 0 <= m <= int(minutes):
+            filtered.append(g)
+
+    return filtered, "stable_v3", f"V3 분석 모델 데이터 {len(filtered)}경기 로드 완료"
