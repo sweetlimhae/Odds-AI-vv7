@@ -1,8 +1,7 @@
 import re
+import requests
 from datetime import datetime, timezone, timedelta
-
 from bs4 import BeautifulSoup
-from playwright.sync_api import sync_playwright
 
 BMBETS_BASE = "https://www.bmbets.com"
 
@@ -23,15 +22,27 @@ def clean_text(text):
     return re.sub(r"\s+", " ", str(text)).strip()
 
 
+def fetch_bmbets_text():
+    headers = {
+        "User-Agent": "Mozilla/5.0",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7",
+    }
+
+    r = requests.get(BMBETS_BASE, headers=headers, timeout=15)
+    r.raise_for_status()
+
+    soup = BeautifulSoup(r.text, "lxml")
+    return clean_text(soup.get_text(" ", strip=True))
+
+
 def detect_sport(text):
     t = text.lower()
 
-    if any(x in t for x in ["baseball", "mlb", "kbo", "npb", "yankees", "dodgers", "giants", "tigers"]):
+    if any(x in t for x in ["baseball", "mlb", "kbo", "npb"]):
         return "baseball"
-
     if any(x in t for x in ["basketball", "nba", "wnba"]):
         return "basketball"
-
     if any(x in t for x in ["hockey", "nhl"]):
         return "hockey"
 
@@ -39,57 +50,19 @@ def detect_sport(text):
 
 
 def detect_league(text):
-    league_words = [
+    leagues = [
         "KBO", "NPB", "MLB",
-        "J League", "J1 League", "J2 League",
-        "K League", "K League 1", "K League 2",
-        "EPL", "Premier League", "Championship",
-        "League One", "League Two",
-        "La Liga", "Segunda",
-        "Serie A", "Serie B",
-        "Bundesliga", "2. Bundesliga",
-        "Ligue 1", "Ligue 2",
-        "Eredivisie",
-        "Primeira Liga",
-        "MLS",
-        "Brazil Serie A",
-        "Argentina Primera",
+        "J League", "K League",
+        "Premier League", "Championship",
+        "La Liga", "Serie A", "Bundesliga",
+        "Ligue 1", "MLS",
     ]
 
-    for word in league_words:
-        if word.lower() in text.lower():
-            return word
+    for league in leagues:
+        if league.lower() in text.lower():
+            return league
 
     return "BMBets"
-
-
-def bmbets_browser_text():
-    with sync_playwright() as p:
-        browser = p.chromium.launch(
-            headless=True,
-            args=[
-                "--no-sandbox",
-                "--disable-dev-shm-usage",
-                "--disable-gpu",
-            ],
-        )
-
-        page = browser.new_page(
-            user_agent=(
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/120.0.0.0 Safari/537.36"
-            )
-        )
-
-        page.goto(BMBETS_BASE, wait_until="networkidle", timeout=45000)
-        page.wait_for_timeout(5000)
-
-        html = page.content()
-        browser.close()
-
-    soup = BeautifulSoup(html, "lxml")
-    return clean_text(soup.get_text(" ", strip=True))
 
 
 def split_market_blocks(text):
@@ -102,13 +75,9 @@ def split_market_blocks(text):
 
     for part in parts:
         part = clean_text(part)
-
-        if len(part) < 40:
-            continue
-
         odds = extract_odds(part)
 
-        if len(odds) >= 2:
+        if len(part) >= 40 and len(odds) >= 2:
             blocks.append(part)
 
     return blocks[:30]
@@ -126,31 +95,14 @@ def make_game_from_block(block, index):
     clean = re.sub(r"\b[1-9]\.\d{2}\b", " ", block)
     clean = clean_text(clean)
 
-    separators = [" vs ", " v ", " - ", " @ "]
-    home = None
-    away = None
+    words = clean.split()
 
-    for sep in separators:
-        if sep in clean:
-            parts = clean.split(sep)
-
-            if len(parts) >= 2:
-                left = clean_text(parts[0])
-                right = clean_text(parts[1])
-
-                home = " ".join(left.split()[-4:])
-                away = " ".join(right.split()[:4])
-                break
-
-    if not home or not away:
-        words = clean.split()
-
-        if len(words) >= 6:
-            home = " ".join(words[:3])
-            away = " ".join(words[3:6])
-        else:
-            home = f"BMBets Match {index + 1}"
-            away = "Market"
+    if len(words) >= 6:
+        home = " ".join(words[:3])
+        away = " ".join(words[3:6])
+    else:
+        home = f"BMBets Match {index + 1}"
+        away = "Market"
 
     markets = []
 
@@ -165,13 +117,8 @@ def make_game_from_block(block, index):
             "best_odds": odd,
             "bookmaker": "BMBets",
             "is_pinnacle": False,
-            "bookmakers": [
-                {
-                    "bookmaker": "BMBets",
-                    "odds": odd,
-                }
-            ],
-            "source": "bmbets_playwright",
+            "bookmakers": [{"bookmaker": "BMBets", "odds": odd}],
+            "source": "bmbets_requests",
         })
 
     return {
@@ -189,7 +136,7 @@ def make_game_from_block(block, index):
 
 def get_games(sport="all"):
     try:
-        text = bmbets_browser_text()
+        text = fetch_bmbets_text()
         blocks = split_market_blocks(text)
 
         games = []
@@ -206,9 +153,9 @@ def get_games(sport="all"):
             games.append(game)
 
         if not games:
-            return [], "bmbets", "BMBets 접속 성공, 하지만 경기 블록을 찾지 못했습니다."
+            return [], "bmbets", "BMBets 접속 성공, 하지만 배당 블록을 찾지 못했습니다."
 
-        return games, "bmbets", f"BMBets Playwright 수집 성공 / {len(games)}개 경기 후보 추출"
+        return games, "bmbets", f"BMBets requests 수집 성공 / {len(games)}개 후보 추출"
 
     except Exception as e:
-        return [], "error", f"BMBets Playwright 수집 실패: {str(e)}"
+        return [], "error", f"BMBets requests 수집 실패: {str(e)}"
