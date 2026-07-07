@@ -104,22 +104,59 @@ def make_game_from_block(block, index):
     sport = detect_sport(block)
     league = detect_league(block)
 
-    current_odds = odds[0]
-    market_avg = round(sum(odds[:6]) / max(1, len(odds[:6])), 2)
-    open_odds = round(current_odds * 1.04, 2)
+    clean = re.sub(r"\b[1-9]\.\d{2}\b", " ", block)
+    clean = clean_text(clean)
 
-    words = block.split()
-    title = " ".join(words[:12]) if words else f"BMBets Match {index + 1}"
+    separators = [" vs ", " v ", " - ", " @ "]
+    home = None
+    away = None
+
+    for sep in separators:
+        if sep in clean:
+            parts = clean.split(sep)
+            if len(parts) >= 2:
+                left = clean_text(parts[0])
+                right = clean_text(parts[1])
+
+                home = " ".join(left.split()[-4:])
+                away = " ".join(right.split()[:4])
+                break
+
+    if not home or not away:
+        words = clean.split()
+        if len(words) >= 6:
+            home = " ".join(words[:3])
+            away = " ".join(words[3:6])
+        else:
+            home = f"BMBets Match {index + 1}"
+            away = "Market"
+
+    markets = []
+
+    for i, odd in enumerate(odds[:6]):
+        markets.append({
+            "pick": home if i % 2 == 0 else away,
+            "type": "h2h",
+            "odds": odd,
+            "open_odds": round(odd * 1.04, 2),
+            "pinnacle_odds": round(odd * 0.98, 2),
+            "market_avg": round(odd * 1.02, 2),
+            "best_odds": odd,
+            "bookmaker": "BMBets",
+            "is_pinnacle": False,
+            "bookmakers": [{"bookmaker": "BMBets", "odds": odd}],
+            "source": "bmbets_playwright",
+        })
 
     return {
         "sport": sport,
         "league": league,
-        "home": title,
-        "away": "Market",
+        "home": home,
+        "away": away,
         "starts_at": (datetime.now(timezone.utc) + timedelta(minutes=60 + index * 20)).isoformat(),
         "start_in_minutes": 60 + index * 20,
-        "markets": [
-            {
+        "markets": markets,
+    }
                 "pick": f"BMBets Pick {i + 1}",
                 "type": "h2h",
                 "odds": odd,
