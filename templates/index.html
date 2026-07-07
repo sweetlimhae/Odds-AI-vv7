@@ -19,13 +19,18 @@
         <option value="all">전체</option>
         <option value="soccer">축구</option>
         <option value="baseball">야구</option>
+        <option value="basketball">농구</option>
+        <option value="hockey">하키</option>
+        <option value="americanfootball">미식축구</option>
       </select>
 
       <label>분석 시간</label>
       <select id="minutes">
-        <option value="30">30분 전</option>
-        <option value="60" selected>1시간 전</option>
-        <option value="120">2시간 전</option>
+        <option value="60">1시간</option>
+        <option value="120" selected>2시간</option>
+        <option value="360">6시간</option>
+        <option value="720">12시간</option>
+        <option value="1440">24시간</option>
       </select>
 
       <button id="gamesBtn">오늘 경기</button>
@@ -35,6 +40,7 @@
     <section id="status" class="status"></section>
     <section id="results" class="results"></section>
   </main>
+
   <script src="/static/app.js"></script>
 </body>
 </html>
