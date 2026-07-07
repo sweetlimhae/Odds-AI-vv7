@@ -77,6 +77,17 @@ function renderGames(games) {
           <div><small>EV</small><b>${ev}%</b></div>
           <div><small>북메이커</small><b>${market.bookmaker || "-"}</b></div>
         </div>
+        ${(market.bookmakers || []).length ? `
+  <div class="book-table">
+    <h3>북메이커 배당</h3>
+    ${(market.bookmakers || []).map(b => `
+      <div class="book-row">
+        <span>${b.bookmaker}</span>
+        <b>${b.odds}</b>
+      </div>
+    `).join("")}
+  </div>
+` : ""}
       </article>
     `;
   }).join("");
