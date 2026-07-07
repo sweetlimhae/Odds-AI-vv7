@@ -1,5 +1,6 @@
 import re
 from datetime import datetime, timezone, timedelta
+
 from bs4 import BeautifulSoup
 from playwright.sync_api import sync_playwright
 
@@ -18,22 +19,41 @@ def extract_odds(text):
     return [safe_float(o) for o in odds if 1.01 <= safe_float(o) <= 20]
 
 
+def clean_text(text):
+    return re.sub(r"\s+", " ", str(text)).strip()
+
+
 def detect_sport(text):
     t = text.lower()
-    if any(x in t for x in ["baseball", "mlb", "kbo", "npb", "yankees", "dodgers"]):
+
+    if any(x in t for x in ["baseball", "mlb", "kbo", "npb", "yankees", "dodgers", "giants", "tigers"]):
         return "baseball"
+
     if any(x in t for x in ["basketball", "nba", "wnba"]):
         return "basketball"
+
     if any(x in t for x in ["hockey", "nhl"]):
         return "hockey"
+
     return "soccer"
 
 
 def detect_league(text):
     league_words = [
-        "KBO", "NPB", "MLB", "J League", "K League", "EPL", "Premier League",
-        "Championship", "La Liga", "Segunda", "Serie A", "Serie B",
-        "Bundesliga", "Ligue 1", "Ligue 2", "MLS"
+        "KBO", "NPB", "MLB",
+        "J League", "J1 League", "J2 League",
+        "K League", "K League 1", "K League 2",
+        "EPL", "Premier League", "Championship",
+        "League One", "League Two",
+        "La Liga", "Segunda",
+        "Serie A", "Serie B",
+        "Bundesliga", "2. Bundesliga",
+        "Ligue 1", "Ligue 2",
+        "Eredivisie",
+        "Primeira Liga",
+        "MLS",
+        "Brazil Serie A",
+        "Argentina Primera",
     ]
 
     for word in league_words:
@@ -41,10 +61,6 @@ def detect_league(text):
             return word
 
     return "BMBets"
-
-
-def clean_text(text):
-    return re.sub(r"\s+", " ", text).strip()
 
 
 def bmbets_browser_text():
@@ -83,14 +99,17 @@ def split_market_blocks(text):
     )
 
     blocks = []
-    for p in parts:
-        p = clean_text(p)
-        if len(p) < 40:
+
+    for part in parts:
+        part = clean_text(part)
+
+        if len(part) < 40:
             continue
 
-        odds = extract_odds(p)
+        odds = extract_odds(part)
+
         if len(odds) >= 2:
-            blocks.append(p)
+            blocks.append(part)
 
     return blocks[:30]
 
@@ -114,6 +133,7 @@ def make_game_from_block(block, index):
     for sep in separators:
         if sep in clean:
             parts = clean.split(sep)
+
             if len(parts) >= 2:
                 left = clean_text(parts[0])
                 right = clean_text(parts[1])
@@ -124,6 +144,7 @@ def make_game_from_block(block, index):
 
     if not home or not away:
         words = clean.split()
+
         if len(words) >= 6:
             home = " ".join(words[:3])
             away = " ".join(words[3:6])
@@ -144,7 +165,12 @@ def make_game_from_block(block, index):
             "best_odds": odd,
             "bookmaker": "BMBets",
             "is_pinnacle": False,
-            "bookmakers": [{"bookmaker": "BMBets", "odds": odd}],
+            "bookmakers": [
+                {
+                    "bookmaker": "BMBets",
+                    "odds": odd,
+                }
+            ],
             "source": "bmbets_playwright",
         })
 
@@ -153,48 +179,13 @@ def make_game_from_block(block, index):
         "league": league,
         "home": home,
         "away": away,
-        "starts_at": (datetime.now(timezone.utc) + timedelta(minutes=60 + index * 20)).isoformat(),
+        "starts_at": (
+            datetime.now(timezone.utc) + timedelta(minutes=60 + index * 20)
+        ).isoformat(),
         "start_in_minutes": 60 + index * 20,
         "markets": markets,
     }
-                "pick": f"BMBets Pick {i + 1}",
-                "type": "h2h",
-                "odds": odd,
-                "open_odds": round(odd * 1.04, 2),
-                "pinnacle_odds": round(odd * 0.98, 2),
-                "market_avg": round(odd * 1.02, 2),
-                "best_odds": odd,
-                "bookmaker": "BMBets",
-                "is_pinnacle": False,
-                "bookmakers": [{"bookmaker": "BMBets", "odds": odd}],
-                "source": "bmbets_playwright",
-            }
-            for i, odd in enumerate(odds[:4])
-        ],
-    }
-def detect_league(text):
-    league_words = [
-        "KBO", "NPB", "MLB",
-        "J League", "J1 League", "J2 League",
-        "K League", "K League 1", "K League 2",
-        "EPL", "Premier League", "Championship",
-        "League One", "League Two",
-        "La Liga", "Segunda",
-        "Serie A", "Serie B",
-        "Bundesliga", "2. Bundesliga",
-        "Ligue 1", "Ligue 2",
-        "Eredivisie",
-        "Primeira Liga",
-        "MLS",
-        "Brazil Serie A",
-        "Argentina Primera",
-    ]
 
-    for word in league_words:
-        if word.lower() in text.lower():
-            return word
-
-    return "BMBets"
 
 def get_games(sport="all"):
     try:
@@ -202,8 +193,10 @@ def get_games(sport="all"):
         blocks = split_market_blocks(text)
 
         games = []
+
         for i, block in enumerate(blocks):
             game = make_game_from_block(block, i)
+
             if not game:
                 continue
 
