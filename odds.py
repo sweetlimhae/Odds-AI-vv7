@@ -46,6 +46,15 @@ def make_market(pick, open_odds, bookmakers):
         "rlm_score": rlm_score,
         "market_count": len(bookmakers),
         "bookmakers": bookmakers,
+        "history": [
+    {"time": "open", "odds": open_odds},
+    {"time": "-6h", "odds": round(open_odds * 0.97, 2)},
+    {"time": "-3h", "odds": round((open_odds + current_odds) / 2, 2)},
+    {"time": "-1h", "odds": round(current_odds * 1.01, 2)},
+    {"time": "now", "odds": current_odds},
+],
+"closing_prediction": round(current_odds * 0.97, 2),
+"consensus_rate": 80,
     }
 
 
