@@ -1,41 +1,51 @@
 from datetime import datetime, timezone, timedelta
 
 
-def make_market(pick, odds, open_odds, pinnacle_odds, market_avg, bookmaker="Model"):
-    drop_rate = round(((open_odds - odds) / open_odds) * 100, 2) if open_odds else 0
-    edge = round(((market_avg - odds) / odds) * 100, 2) if odds else 0
+def avg(nums):
+    nums = [n for n in nums if n and n > 1]
+    return round(sum(nums) / len(nums), 2) if nums else 0
 
-    steam_score = min(100, max(0, round(drop_rate * 10)))
-    sharp_score = min(100, max(0, round((open_odds - pinnacle_odds) / open_odds * 1000))) if open_odds else 0
-    clv_score = min(100, max(0, round((market_avg - pinnacle_odds) / market_avg * 1000))) if market_avg else 0
+
+def pct_drop(open_odds, current_odds):
+    if not open_odds or not current_odds:
+        return 0
+    return round(((open_odds - current_odds) / open_odds) * 100, 2)
+
+
+def make_market(pick, open_odds, bookmakers):
+    pinnacle = next((b["odds"] for b in bookmakers if b["bookmaker"].lower() == "pinnacle"), None)
+    odds_values = [b["odds"] for b in bookmakers]
+    market_avg = avg(odds_values)
+    best = max(odds_values)
+
+    current_odds = pinnacle or market_avg
+    drop_rate = pct_drop(open_odds, current_odds)
+
+    sharp_score = min(100, max(0, round(drop_rate * 10 + (15 if pinnacle and pinnacle < market_avg else 0))))
+    steam_score = min(100, max(0, round(drop_rate * 12)))
+    clv_score = min(100, max(0, round(((market_avg - current_odds) / market_avg) * 1000))) if market_avg else 0
+    rlm_score = min(100, max(0, round(drop_rate * 8 + (20 if current_odds < market_avg else 0))))
 
     return {
         "pick": pick,
         "type": "moneyline",
-        "odds": odds,
+        "odds": current_odds,
         "open_odds": open_odds,
-        "pinnacle_odds": pinnacle_odds,
+        "pinnacle_odds": pinnacle,
         "market_avg": market_avg,
-        "best_odds": odds,
-        "bookmaker": bookmaker,
-        "is_pinnacle": bookmaker.lower() == "pinnacle" or bookmaker == "Model",
-        "source": "stable_model_v3",
+        "best_odds": best,
+        "bookmaker": "Pinnacle" if pinnacle else "Market Avg",
+        "is_pinnacle": bool(pinnacle),
+        "source": "bookmaker_consensus_v1",
 
         "drop_rate": drop_rate,
-        "edge": edge,
-        "movement": "down" if odds < open_odds else "up",
+        "movement": "down" if current_odds < open_odds else "up",
         "steam_score": steam_score,
         "sharp_score": sharp_score,
         "clv_score": clv_score,
-        "market_count": 5,
-
-        "bookmakers": [
-            {"bookmaker": "Pinnacle", "odds": pinnacle_odds},
-            {"bookmaker": "Bet365", "odds": round(odds * 1.01, 2)},
-            {"bookmaker": "SBOBET", "odds": round(odds * 0.99, 2)},
-            {"bookmaker": "1xBet", "odds": round(odds * 1.02, 2)},
-            {"bookmaker": "Market Avg", "odds": market_avg},
-        ],
+        "rlm_score": rlm_score,
+        "market_count": len(bookmakers),
+        "bookmakers": bookmakers,
     }
 
 
@@ -51,7 +61,13 @@ def get_games(sport="all", minutes=1440):
             "starts_at": (now + timedelta(minutes=120)).isoformat(),
             "start_in_minutes": 120,
             "markets": [
-                make_market("KIA Tigers", 2.05, 2.24, 1.98, 2.12)
+                make_market("KIA Tigers", 2.24, [
+                    {"bookmaker": "Pinnacle", "odds": 1.98},
+                    {"bookmaker": "Bet365", "odds": 2.05},
+                    {"bookmaker": "SBOBET", "odds": 2.02},
+                    {"bookmaker": "1xBet", "odds": 2.08},
+                    {"bookmaker": "188Bet", "odds": 2.04},
+                ])
             ],
         },
         {
@@ -62,7 +78,13 @@ def get_games(sport="all", minutes=1440):
             "starts_at": (now + timedelta(minutes=150)).isoformat(),
             "start_in_minutes": 150,
             "markets": [
-                make_market("Hanshin Tigers", 1.87, 2.01, 1.83, 1.94)
+                make_market("Hanshin Tigers", 2.01, [
+                    {"bookmaker": "Pinnacle", "odds": 1.83},
+                    {"bookmaker": "Bet365", "odds": 1.87},
+                    {"bookmaker": "SBOBET", "odds": 1.86},
+                    {"bookmaker": "1xBet", "odds": 1.90},
+                    {"bookmaker": "188Bet", "odds": 1.88},
+                ])
             ],
         },
         {
@@ -73,7 +95,13 @@ def get_games(sport="all", minutes=1440):
             "starts_at": (now + timedelta(minutes=180)).isoformat(),
             "start_in_minutes": 180,
             "markets": [
-                make_market("Arsenal", 1.78, 1.92, 1.74, 1.84)
+                make_market("Arsenal", 1.92, [
+                    {"bookmaker": "Pinnacle", "odds": 1.74},
+                    {"bookmaker": "Bet365", "odds": 1.78},
+                    {"bookmaker": "SBOBET", "odds": 1.77},
+                    {"bookmaker": "1xBet", "odds": 1.82},
+                    {"bookmaker": "188Bet", "odds": 1.79},
+                ])
             ],
         },
         {
@@ -84,7 +112,13 @@ def get_games(sport="all", minutes=1440):
             "starts_at": (now + timedelta(minutes=210)).isoformat(),
             "start_in_minutes": 210,
             "markets": [
-                make_market("Ulsan HD", 1.83, 1.96, 1.79, 1.90)
+                make_market("Ulsan HD", 1.96, [
+                    {"bookmaker": "Pinnacle", "odds": 1.79},
+                    {"bookmaker": "Bet365", "odds": 1.83},
+                    {"bookmaker": "SBOBET", "odds": 1.82},
+                    {"bookmaker": "1xBet", "odds": 1.86},
+                    {"bookmaker": "188Bet", "odds": 1.84},
+                ])
             ],
         },
     ]
@@ -92,10 +126,6 @@ def get_games(sport="all", minutes=1440):
     if sport != "all":
         games = [g for g in games if g["sport"] == sport]
 
-    filtered = []
-    for g in games:
-        m = g.get("start_in_minutes", 0)
-        if 0 <= m <= int(minutes):
-            filtered.append(g)
+    games = [g for g in games if 0 <= g["start_in_minutes"] <= int(minutes)]
 
-    return filtered, "stable_v3", f"V3 분석 모델 데이터 {len(filtered)}경기 로드 완료"
+    return games, "bookmaker_v1", f"북메이커 컨센서스 데이터 {len(games)}경기 로드 완료"
