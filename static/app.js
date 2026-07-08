@@ -32,7 +32,40 @@ function decisionClass(decision) {
   if (decision === "WATCH") return "watch";
   return "nobet";
 }
+function miniChartId(gameIndex) {
+  return `oddsChart_${gameIndex}`;
+}
 
+function drawOddsChart(canvasId, history) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas || !history || history.length === 0) return;
+
+  new Chart(canvas, {
+    type: "line",
+    data: {
+      labels: history.map(h => h.time),
+      datasets: [{
+        label: "Odds",
+        data: history.map(h => h.odds),
+        tension: 0.35
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { display: false }
+      },
+      scales: {
+        y: {
+          reverse: false
+        }
+      }
+    }
+  });
+}
+
+function renderGames(games) {
+    ...
 function renderGames(games) {
   if (!games || games.length === 0) {
     resultsEl.innerHTML = `<div class="card">조건에 맞는 경기가 없습니다.</div>`;
