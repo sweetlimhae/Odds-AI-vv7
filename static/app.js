@@ -76,6 +76,33 @@ function renderGames(games) {
           <div><small>Edge</small><b>${edge}%</b></div>
           <div><small>EV</small><b>${ev}%</b></div>
           <div><small>북메이커</small><b>${market.bookmaker || "-"}</b></div>
+          ${(market.history || []).length ? `
+  <div class="book-table">
+    <h3>배당 흐름</h3>
+    ${(market.history || []).map(h => `
+      <div class="book-row">
+        <span>${h.time}</span>
+        <b>${h.odds}</b>
+      </div>
+    `).join("")}
+  </div>
+
+  <div class="book-table">
+    <h3>Closing Odds 예측</h3>
+    <div class="book-row">
+      <span>현재 배당</span>
+      <b>${market.odds}</b>
+    </div>
+    <div class="book-row">
+      <span>예상 Closing</span>
+      <b>${market.closing_prediction ?? "-"}</b>
+    </div>
+    <div class="book-row">
+      <span>Consensus</span>
+      <b>${market.consensus_rate ?? "-"}%</b>
+    </div>
+  </div>
+` : ""}
         </div>
         ${(market.bookmakers || []).length ? `
   <div class="book-table">
